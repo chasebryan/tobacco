@@ -1,3 +1,4 @@
+import errno
 import json
 import os
 from pathlib import Path
@@ -137,7 +138,13 @@ class ScannerTests(unittest.TestCase):
     @unittest.skipUnless(os.name == "posix", "POSIX filename bytes")
     def test_sarif_handles_non_utf8_filename_bytes(self):
         path = os.fsencode(self.root) + b"/invalid-\xff.py"
-        with open(path, "wb") as stream:
+        try:
+            stream = open(path, "wb")
+        except OSError as error:
+            if error.errno == errno.EILSEQ:
+                self.skipTest("This filesystem requires valid UTF-8 filenames")
+            raise
+        with stream:
             stream.write(b"eval(input())\n")
         report = scan(self.root)
         run = render_sarif(report)["runs"][0]
